@@ -22,21 +22,18 @@ class LeitorCSV:
             with open(caminho_arquivo, mode='r', encoding='utf-8') as arquivo:
                 leitor = csv.DictReader(arquivo)
                 
-                # Validação de consistência: o arquivo possui o cabeçalho correto?
                 colunas_obrigatorias = {'id_pedido', 'valor', 'data'}
                 if leitor.fieldnames and not colunas_obrigatorias.issubset(set(leitor.fieldnames)):
                     raise KeyError(f"Colunas obrigatórias ausentes. O arquivo precisa ter: {colunas_obrigatorias}")
 
                 for linha in leitor:
                     try:
-                        # Limpa espaços em branco e converte os tipos de dados de forma segura
                         id_pedido = linha['id_pedido'].strip()
                         valor = float(linha['valor'].strip())
                         data = linha['data'].strip()
                         
                         transacoes.append(Transacao(id_pedido, valor, data))
                     except ValueError:
-                        # Evita que uma linha corrompida derrube o sistema inteiro
                         print(f"[AVISO] Linha ignorada por dados inválidos no arquivo {caminho_arquivo}: {linha}")
                         continue
                         
@@ -61,15 +58,15 @@ class Conciliador:
         self.divergencias = []
 
     def conciliar(self) -> list:
-        if not self.sistema or not self.banco:
+        if not self.sistema and not self.banco:
             print("[AVISO] Não há dados suficientes para realizar a conciliação.")
             return []
 
-        # Mapeia a lista do banco em um dicionário para busca de alta performance O(1)
+        banco_dict = {t.id_pedido: t for t in self.banco}
+        
         banco_dict = {t.id_pedido: t for t in self.banco}
         
         for t_sistema in self.sistema:
-            # 1. Verifica se o pedido gerado no sistema chegou a constar no extrato do banco
             if t_sistema.id_pedido not in banco_dict:
                 self.divergencias.append({
                     "id_pedido": t_sistema.id_pedido,
@@ -79,7 +76,6 @@ class Conciliador:
                 })
             else:
                 t_banco = banco_dict[t_sistema.id_pedido]
-                # 2. Compara os valores usando round() para evitar imprecisões de ponto flutuante (centavos)
                 if round(t_sistema.valor, 2) != round(t_banco.valor, 2):
                     self.divergencias.append({
                         "id_pedido": t_sistema.id_pedido,
@@ -109,8 +105,6 @@ class Conciliador:
         except Exception as e:
             print(f"[ERRO] Não foi possível exportar o arquivo de saída: {e}")
 
-
-# --- EXECUÇÃO DO FLUXO PRINCIPAL ---
 if __name__ == "__main__":
     print("Iniciando Motor de Conciliação Financeira...\n")
     print("Carregando os dados dos arquivos CSV...")
